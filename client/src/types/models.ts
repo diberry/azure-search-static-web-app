@@ -1,6 +1,4 @@
-// Type definitions for the application models
-
-export interface Document {
+export interface BookDocument {
   id: string;
   authors?: string[];
   average_rating?: string | number;
@@ -24,21 +22,15 @@ export interface Document {
   work_id?: number;
   work_ratings_count?: number;
   work_text_reviews_count?: number;
-  [key: string]: any; // Allow for additional dynamic properties
-}
-
-export interface SearchResult {
-  document: Document;
-  score?: number;
+  [key: string]: unknown;
 }
 
 export interface FacetValue {
   value: string;
   count: number;
-  selected: boolean;
 }
 
-export interface Facet {
-  fieldName: string;
-  values: FacetValue[];
+export interface Filter {
+  field: string;
+  value: string;
 }

@@ -1,72 +1,59 @@
 import { useState } from 'react';
+import Checkbox from '@mui/material/Checkbox';
+import Collapse from '@mui/material/Collapse';
+import FormControlLabel from '@mui/material/FormControlLabel';
+import List from '@mui/material/List';
+import ListItem from '@mui/material/ListItem';
+import ListItemButton from '@mui/material/ListItemButton';
+import ListItemText from '@mui/material/ListItemText';
+import ExpandLess from '@mui/icons-material/ExpandLess';
+import ExpandMore from '@mui/icons-material/ExpandMore';
+import type { CheckboxFacetProps } from '../../../types/props';
 
-import Box from '@mui/material/Box';
-import {
-  FacetListItem,
-  FacetValueItem,
-  FacetList,
-  CustomCheckbox,
-  ExpandIcon
-} from './styles.jsx';
+export default function CheckboxFacet({
+  name,
+  values,
+  selectedFacets,
+  addFilter,
+  removeFilter,
+  mapFacetName,
+}: CheckboxFacetProps) {
+  const [isExpanded, setIsExpanded] = useState(false);
 
-export default function CheckboxFacet(props) {
-    const [isExpanded, setIsExpanded] = useState<boolean>(false);
-
-    const checkboxes = props.values.map(facetValue => {
-        let isSelected = props.selectedFacets.some(facet => facet.value === facetValue.value);
-        
-        const handleClick = () => {
-            if (isSelected) {
-                props.removeFilter({field: props.name, value: facetValue.value});
-            } else {
-                props.addFilter(props.name, facetValue.value);
-            }
-        };
-        
-        return (
-            <li key={facetValue.value}>
-                <FacetValueItem
-                    id={facetValue.value}
-                    onClick={handleClick}
-                >
-                    <CustomCheckbox checked={isSelected} />
-                    <span style={{ 
-                        fontSize: '0.875rem',
-                        fontFamily: 'Roboto, Arial, sans-serif'
-                    }}>
-                        {`${facetValue.value} (${facetValue.count})`}
-                    </span>
-                </FacetValueItem>
-            </li>
-        );
-    });
-
-    // Simple animation styles for collapse effect
-    const collapseStyle = {
-        maxHeight: isExpanded ? '1000px' : '0',
-        overflow: 'hidden',
-        transition: 'max-height 0.3s ease-in-out',
-    };
-
-    return (
-        <Box className="mui-facet-isolation-wrapper">
-            <FacetListItem 
-                onClick={() => setIsExpanded(!isExpanded)}
-                style={{ fontWeight: 500 }}
-            >
-                <span style={{ 
-                    fontWeight: 500,
-                    fontFamily: 'Roboto, Arial, sans-serif'
-                }}>
-                    {props.mapFacetName(props.name)}
-                </span>
-                <ExpandIcon expanded={isExpanded} />
-            </FacetListItem>
-            <div style={collapseStyle}>
-                <FacetList>
-                    {checkboxes}
-                </FacetList>
-            </div>
-        </Box>
-    );
+  return (
+    <div>
+      <ListItemButton
+        onClick={() => setIsExpanded(expanded => !expanded)}
+        aria-expanded={isExpanded}
+        aria-controls={`${name}-facet-values`}
+      >
+        <ListItemText primary={mapFacetName(name)} />
+        {isExpanded ? <ExpandLess /> : <ExpandMore />}
+      </ListItemButton>
+      <Collapse in={isExpanded} id={`${name}-facet-values`}>
+        <List disablePadding>
+          {values.map(facetValue => {
+            const filter = { field: name, value: facetValue.value };
+            const selected = selectedFacets.some(
+              selectedFacet => selectedFacet.value === facetValue.value,
+            );
+            return (
+              <ListItem key={facetValue.value} dense disableGutters>
+                <FormControlLabel
+                  sx={{ ml: 2 }}
+                  control={
+                    <Checkbox
+                      checked={selected}
+                      onChange={() => selected ? removeFilter(filter) : addFilter(name, facetValue.value)}
+                    />
+                  }
+                  label={`${facetValue.value} (${facetValue.count})`}
+                />
+              </ListItem>
+            );
+          })}
+        </List>
+      </Collapse>
+    </div>
+  );
 }

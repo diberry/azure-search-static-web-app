@@ -1,49 +1,56 @@
-import Box from '@mui/material/Box';
-import { ResultProps } from '../../../types/props';
-import {
-  ResultCard,
-  ResultImage,
-  TitleText
-} from './styled.jsx';
+import { styled } from '@mui/material/styles';
+import type { ResultProps } from '../../../types/props';
 
-export default function Result(props: ResultProps) {
-  const title = props.document.original_title || '<NO TITLE>'; 
+const ResultCard = styled('a')(({ theme }) => ({
+  width: theme.spacing(25),
+  height: theme.spacing(27.5),
+  padding: theme.spacing(1),
+  margin: theme.spacing(1.25),
+  display: 'flex',
+  flexDirection: 'column',
+  overflow: 'hidden',
+  textAlign: 'center',
+  textDecoration: 'none',
+  color: theme.palette.secondary.main,
+  backgroundColor: theme.palette.background.paper,
+  border: `${theme.spacing(0.125)} solid ${theme.palette.divider}`,
+  borderRadius: theme.shape.borderRadius,
+  boxShadow: theme.shadows[2],
+  transition: theme.transitions.create('background-color'),
+  '&:hover, &:active': {
+    color: theme.palette.secondary.dark,
+    backgroundColor: theme.palette.action.hover,
+  },
+}));
 
+const ResultImage = styled('img')(({ theme }) => ({
+  width: '100%',
+  height: theme.spacing(18.75),
+  objectFit: 'contain',
+  display: 'block',
+  backgroundColor: theme.palette.background.default,
+}));
 
-  console.log(props.document);
-  
+const ResultTitle = styled('span')(({ theme }) => ({
+  minHeight: theme.spacing(5.25),
+  padding: theme.spacing(0, 1),
+  display: '-webkit-box',
+  overflow: 'hidden',
+  WebkitBoxOrient: 'vertical',
+  WebkitLineClamp: 2,
+  fontSize: theme.typography.pxToRem(14),
+  lineHeight: 1.4,
+}));
+
+export default function Result({ document }: ResultProps) {
+  const title = document.original_title || document.title || '<NO TITLE>';
+
   return (
-    <Box className="mui-result-isolation-wrapper">
-      <ResultCard>
-        <a href={`/details/${props.document.id}`} style={{ 
-            textDecoration: 'none',
-            display: 'block',
-            height: '100%'
-          }}>
-          {/* Using div with inline styles instead of Box component to reduce bundle size */}
-          <div style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
-            {/* Image section - fixed height */}
-            <div style={{ height: '150px', marginBottom: '8px' }}>
-              <ResultImage 
-                src={props.document.image_url} 
-                alt={props.document.original_title}
-              />
-            </div>
-            
-            {/* Text section - centered in remaining space */}
-            <div style={{ 
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              flex: 1
-            }}>
-              <TitleText>
-                {title}
-              </TitleText>
-            </div>
-          </div>
-        </a>
-      </ResultCard>
-    </Box>
+    <ResultCard href={`/details/${document.id}`} aria-label={`View details for ${title}`}>
+      <ResultImage src={document.image_url} alt="" />
+      <span style={{ flex: 1, display: 'grid', placeItems: 'center' }}>
+        <ResultTitle>{title}</ResultTitle>
+      </span>
+    </ResultCard>
   );
 }

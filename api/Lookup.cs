@@ -1,5 +1,6 @@
 using Azure;
 using Azure.Core.Serialization;
+using Azure.Identity;
 using Azure.Search.Documents;
 using Azure.Search.Documents.Models;
 using Microsoft.Azure.Functions.Worker;
@@ -13,10 +14,6 @@ namespace WebSearch.Function
 {
     public class Lookup
     {
-        private static string searchApiKey = Environment.GetEnvironmentVariable("SearchApiKey", EnvironmentVariableTarget.Process);
-        private static string searchServiceName = Environment.GetEnvironmentVariable("SearchServiceName", EnvironmentVariableTarget.Process);
-        private static string searchIndexName = Environment.GetEnvironmentVariable("SearchIndexName", EnvironmentVariableTarget.Process) ?? "good-books";
-
         private readonly ILogger<Lookup> _logger;
 
         public Lookup(ILogger<Lookup> logger)
@@ -33,19 +30,30 @@ namespace WebSearch.Function
 
             // Get Document Id
             var query = System.Web.HttpUtility.ParseQueryString(req.Url.Query);
-            string documentId = query["id"].ToString();
+            string? documentId = query["id"];
+            if (string.IsNullOrWhiteSpace(documentId))
+            {
+                return await ApiResponses.WriteErrorAsync(
+                    req,
+                    HttpStatusCode.BadRequest,
+                    "The id query parameter is required.");
+            }
 
-            // Azure AI Search 
-            Uri serviceEndpoint = new($"https://{searchServiceName}.search.windows.net/");
+            // Azure AI Search (managed identity by default; API key only when SEARCH_USE_KEY_AUTH=true)
+            SearchClient searchClient = SearchClientFactory.CreateSearchClient();
 
-            SearchClient searchClient = new(
-
-                serviceEndpoint,
-                searchIndexName,
-                new AzureKeyCredential(searchApiKey)
-            );
-
-            var getDocumentResponse = await searchClient.GetDocumentAsync<SearchDocument>(documentId);
+            Response<SearchDocument> getDocumentResponse;
+            try
+            {
+                getDocumentResponse = await searchClient.GetDocumentAsync<SearchDocument>(documentId);
+            }
+            catch (RequestFailedException exception) when (exception.Status == (int)HttpStatusCode.NotFound)
+            {
+                return await ApiResponses.WriteErrorAsync(
+                    req,
+                    HttpStatusCode.NotFound,
+                    $"Document '{documentId}' was not found.");
+            }
 
             // Data to return 
             var output = new LookupOutput
@@ -53,7 +61,7 @@ namespace WebSearch.Function
                 Document = getDocumentResponse.Value
             };
 
-            var response = req.CreateResponse(HttpStatusCode.Found);
+            var response = req.CreateResponse(HttpStatusCode.OK);
 
             // Serialize data
             var serializer = new JsonObjectSerializer(

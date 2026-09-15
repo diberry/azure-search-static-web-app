@@ -1,42 +1,52 @@
-// Use localhost in development, empty string in production for relative URLs
-const baseURL = import.meta.env.DEV 
-    ? (import.meta.env.VITE_REACT_APP_BACKEND_URL || 'http://localhost:7071')
-    : (import.meta.env.VITE_REACT_APP_BACKEND_URL || '');
-console.log(`baseURL = ${baseURL}`);
-console.log(`Environment: ${import.meta.env.MODE}`);
+const runtimeBackendUrl =
+  (typeof window !== 'undefined' && window.__APP_CONFIG__?.BACKEND_URL) || '';
+const baseURL = import.meta.env.DEV
+  ? (import.meta.env.VITE_REACT_APP_BACKEND_URL || 'http://localhost:7071')
+  : (runtimeBackendUrl || import.meta.env.VITE_REACT_APP_BACKEND_URL || '');
 
-function buildQueryString(params: Record<string, string | number | boolean>): string {
-    return Object.keys(params)
-        .map(key => `${encodeURIComponent(key)}=${encodeURIComponent(params[key].toString())}`)
-        .join('&');
-}
+type QueryValue = string | number | boolean;
 
 interface FetchOptions {
-    query?: Record<string, string | number | boolean>;
-    body?: any;
-    headers?: Record<string, string>;
-    method?: string;
+  query?: Record<string, QueryValue>;
+  body?: unknown;
+  headers?: Record<string, string>;
+  method?: string;
+  signal?: AbortSignal;
 }
 
-async function fetchInstance<T = any>(url: string, { query = {}, body = null, headers = {}, method = 'GET' }: FetchOptions = {}): Promise<T> {
-    const queryString = buildQueryString(query as Record<string, string | number | boolean>);
-    // Handle empty baseURL for production (relative URLs)
-    const fullUrl = baseURL ? `${baseURL}${url}${queryString ? `?${queryString}` : ''}` : `${url}${queryString ? `?${queryString}` : ''}`;
-
-    const response = await fetch(fullUrl, {
-        method,
-        headers: {
-            'Content-Type': 'application/json',
-            ...headers
-        },
-        body: body ? JSON.stringify(body) : null
-    });
-
-    if (response.ok || (response.status >= 200 && response.status < 400)) {
-        return await response.json() as T;
-    } else {
-        throw new Error(`HTTP error! status: ${response.status}`);
-    }
+function buildQueryString(params: Record<string, QueryValue>): string {
+  return Object.entries(params)
+    .map(([key, value]) => `${encodeURIComponent(key)}=${encodeURIComponent(value)}`)
+    .join('&');
 }
 
-export default fetchInstance;
+export default async function fetchInstance<T>(
+  url: string,
+  {
+    query = {},
+    body = null,
+    headers = {},
+    method = 'GET',
+    signal,
+  }: FetchOptions = {},
+): Promise<T> {
+  const queryString = buildQueryString(query);
+  const fullUrl = baseURL
+    ? `${baseURL}${url}${queryString ? `?${queryString}` : ''}`
+    : `${url}${queryString ? `?${queryString}` : ''}`;
+  const response = await fetch(fullUrl, {
+    method,
+    headers: {
+      'Content-Type': 'application/json',
+      ...headers,
+    },
+    body: body ? JSON.stringify(body) : null,
+    signal,
+  });
+
+  if (!response.ok) {
+    throw new Error(`HTTP error! status: ${response.status}`);
+  }
+
+  return response.json() as Promise<T>;
+}

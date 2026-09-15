@@ -7,7 +7,6 @@ using Microsoft.Azure.Functions.Worker.Http;
 using Microsoft.Extensions.Logging;
 using System.Net;
 using System.Text.Json;
-using System.Text.Json.Serialization;
 using WebSearch.Models;
 using SearchFilter = WebSearch.Models.SearchFilter;
 
@@ -15,10 +14,6 @@ namespace WebSearch.Function
 {
     public class Search
     {
-        private static string searchApiKey = Environment.GetEnvironmentVariable("SearchApiKey", EnvironmentVariableTarget.Process);
-        private static string searchServiceName = Environment.GetEnvironmentVariable("SearchServiceName", EnvironmentVariableTarget.Process);
-        private static string searchIndexName = Environment.GetEnvironmentVariable("SearchIndexName", EnvironmentVariableTarget.Process) ?? "good-books";
-
         private readonly ILogger<Lookup> _logger;
 
         public Search(ILogger<Lookup> logger)
@@ -33,15 +28,19 @@ namespace WebSearch.Function
         {
             string requestBody = await new StreamReader(req.Body).ReadToEndAsync();
             var data = JsonSerializer.Deserialize<RequestBodySearch>(requestBody);
+            if (data is null || data.Size is < 1 or > 100 || data.Skip < 0)
+            {
+                return await ApiResponses.WriteErrorAsync(
+                    req,
+                    HttpStatusCode.BadRequest,
+                    "The request must include top between 1 and 100 and a nonnegative skip value.");
+            }
 
-            // Azure AI Search 
-            Uri serviceEndpoint = new($"https://{searchServiceName}.search.windows.net/");
+            data.SearchText = string.IsNullOrWhiteSpace(data.SearchText) ? "*" : data.SearchText;
+            data.Filters ??= [];
 
-            SearchClient searchClient = new(
-                serviceEndpoint,
-                searchIndexName,
-                new AzureKeyCredential(searchApiKey)
-            );
+            // Azure AI Search (managed identity by default; API key only when SEARCH_USE_KEY_AUTH=true)
+            SearchClient searchClient = SearchClientFactory.CreateSearchClient();
 
             SearchOptions options = new()
 
@@ -73,7 +72,7 @@ namespace WebSearch.Function
                 Facets = facetOutput
             };
             
-            var response = req.CreateResponse(HttpStatusCode.Found);
+            var response = req.CreateResponse(HttpStatusCode.OK);
 
             // Serialize data
             var serializer = new JsonObjectSerializer(

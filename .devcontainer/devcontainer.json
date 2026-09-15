@@ -33,7 +33,7 @@
 
 	// Use 'forwardPorts' to make a list of ports inside the container available locally.
 	"forwardPorts": [7071, 3000],
-	
+
 	// Install dependencies after container creation
 	"postCreateCommand": "cd api && dotnet restore && cd ../client && npm install",
 	// "portsAttributes": {

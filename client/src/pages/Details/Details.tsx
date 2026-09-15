@@ -1,115 +1,175 @@
-import React, { useState, useEffect } from "react";
-import { useParams } from 'react-router-dom';
-import Rating from '@mui/material/Rating';
-import CircularProgress from '@mui/material/CircularProgress';
-import Tabs from '@mui/material/Tabs';
-import Tab from '@mui/material/Tab';
+import { useEffect, useState } from 'react';
+import Alert from '@mui/material/Alert';
 import Box from '@mui/material/Box';
-
+import CircularProgress from '@mui/material/CircularProgress';
+import Rating from '@mui/material/Rating';
+import Tab from '@mui/material/Tab';
+import Tabs from '@mui/material/Tabs';
+import Typography from '@mui/material/Typography';
+import { styled } from '@mui/material/styles';
+import { useParams } from 'react-router-dom';
+import type { LookupResponse } from '../../types/api';
+import type { BookDocument } from '../../types/models';
 import fetchInstance from '../../url-fetch';
-import { Document } from '../../types/models';
 
-import {
-  TabPanel,
-  TabPanelValue,
-  CardBody,
-  ImageContainer,
-  CardTitle,
-  CardText,
-  BoxContent,
-  DetailsBoxParent,
-  DetailsTabBoxHeader,
-  DetailsCustomTabPanelJsonDiv
-} from './styled';
+const DetailsMain = styled('main')(({ theme }) => ({
+  width: '100%',
+  minWidth: 0,
+  minHeight: theme.spacing(80),
+  padding: theme.spacing(3, 2),
+  [theme.breakpoints.up('md')]: {
+    paddingLeft: theme.spacing(18.75),
+    paddingRight: theme.spacing(18.75),
+  },
+}));
 
+const TabPanel = styled('div')(({ theme }) => ({
+  width: '100%',
+  minWidth: 0,
+  padding: theme.spacing(2),
+  backgroundColor: theme.palette.background.paper,
+  border: `${theme.spacing(0.125)} solid ${theme.palette.divider}`,
+  boxShadow: theme.shadows[2],
+}));
+
+const DetailCard = styled('div')(({ theme }) => ({
+  width: '100%',
+  minWidth: 0,
+  display: 'flex',
+  flexDirection: 'column',
+  alignItems: 'center',
+  padding: theme.spacing(2),
+}));
+
+const CoverImage = styled('img')(({ theme }) => ({
+  width: theme.spacing(20),
+  maxWidth: '100%',
+  height: 'auto',
+  marginBottom: theme.spacing(2),
+}));
+
+const RawData = styled('div')({
+  width: '100%',
+  minWidth: 0,
+  textAlign: 'left',
+  '& pre': {
+    width: '100%',
+    maxWidth: '100%',
+    overflowX: 'auto',
+    whiteSpace: 'pre',
+  },
+});
 
 interface CustomTabPanelProps {
-  children?: React.ReactNode;
+  children: React.ReactNode;
   value: number;
   index: number;
-  component?: React.ElementType;
-  [key: string]: any; // For other props
 }
 
-function CustomTabPanel(props: CustomTabPanelProps) {
-  const { children, value, index, ...other } = props;
-
+function CustomTabPanel({ children, value, index }: CustomTabPanelProps) {
   return (
     <TabPanel
       role="tabpanel"
       hidden={value !== index}
-      id={`simple-tabpanel-${index}`}
-      aria-labelledby={`simple-tab-${index}`}
-      {...other}
+      id={`book-tabpanel-${index}`}
+      aria-labelledby={`book-tab-${index}`}
     >
-      {value === index && <TabPanelValue>{children}</TabPanelValue>}
+      {value === index && children}
     </TabPanel>
   );
 }
 
-export default function BasicTabs() {
+export default function Details() {
   const { id } = useParams();
-  const [document, setDocument] = useState<Document>({} as Document);
-  const [value, setValue] = React.useState(0);
+  const [document, setDocument] = useState<BookDocument>();
+  const [activeTab, setActiveTab] = useState(0);
   const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState<string>();
 
   useEffect(() => {
+    if (!id) {
+      setError('A book identifier is required.');
+      setIsLoading(false);
+      return undefined;
+    }
+
+    const controller = new AbortController();
     setIsLoading(true);
-    fetchInstance('/api/lookup', { query: { id: id as string } })
+    setError(undefined);
+    fetchInstance<LookupResponse>('/api/lookup', {
+      query: { id },
+      signal: controller.signal,
+    })
       .then(response => {
-        console.log(JSON.stringify(response))
-        const doc = response.document;
-        setDocument(doc);
+        setDocument(response.document);
         setIsLoading(false);
       })
-      .catch(error => {
-        console.log(error);
-        setIsLoading(false);
+      .catch(requestError => {
+        if (requestError instanceof Error && requestError.name !== 'AbortError') {
+          console.error('Lookup error:', requestError);
+          setError('Unable to load book details.');
+          setIsLoading(false);
+        }
       });
-
+    return () => controller.abort();
   }, [id]);
 
-  const handleChange = (_, newValue) => {
-    setValue(newValue);
-  };
-
-
-  if (isLoading || !id || Object.keys(document).length === 0) {
+  if (isLoading) {
     return (
-      <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center', padding: '2em' }}>
-        <CircularProgress />
-        <Box sx={{ mt: 2 }}>Loading...</Box>
-      </Box>
+      <DetailsMain aria-live="polite">
+        <Box sx={{ display: 'grid', placeItems: 'center', py: 4 }}>
+          <CircularProgress aria-label="Loading book details" />
+          <Typography sx={{ mt: 2 }}>Loading...</Typography>
+        </Box>
+      </DetailsMain>
     );
   }
 
+  if (error || !document) {
+    return (
+      <DetailsMain>
+        <Alert severity="error">{error || 'Unable to load book details.'}</Alert>
+      </DetailsMain>
+    );
+  }
+
+  const title = document.original_title || document.title || '<NO TITLE>';
   return (
-    <DetailsBoxParent>
-      <DetailsTabBoxHeader>
-        <Tabs value={value} onChange={handleChange} aria-label="book-details-tabs">
-          <Tab label="Result" />
-          <Tab label="Raw Data" />
+    <DetailsMain>
+      <Box sx={{ borderBottom: 1, borderColor: 'divider' }}>
+        <Tabs
+          value={activeTab}
+          onChange={(_, value: number) => setActiveTab(value)}
+          aria-label="Book details"
+          indicatorColor="secondary"
+          textColor="secondary"
+        >
+          <Tab label="Result" id="book-tab-0" aria-controls="book-tabpanel-0" />
+          <Tab label="Raw Data" id="book-tab-1" aria-controls="book-tabpanel-1" />
         </Tabs>
-      </DetailsTabBoxHeader>
-      <CustomTabPanel value={value} index={0} component={BoxContent}>
-        <CardBody>
-          <CardTitle variant="h5">{document.original_title}</CardTitle>
-          <ImageContainer src={document.image_url} alt="Book cover" />
-          <CardText variant="body1">{document.authors?.join('; ')} - {document.original_publication_year}</CardText>
-          <CardText variant="body1">ISBN {document.isbn}</CardText>
-          <Rating name="half-rating-read" value={document.average_rating ? Number(document.average_rating) : 0} precision={0.1} readOnly></Rating>
-          <CardText variant="body1">{document.ratings_count} Ratings</CardText>
-        </CardBody>
+      </Box>
+      <CustomTabPanel value={activeTab} index={0}>
+        <DetailCard>
+          <Typography variant="h5" component="h1" textAlign="center" sx={{ mb: 1 }}>
+            {title}
+          </Typography>
+          <CoverImage src={document.image_url} alt="Book cover" />
+          <Typography>{document.authors?.join('; ')} - {document.original_publication_year}</Typography>
+          <Typography>ISBN {document.isbn}</Typography>
+          <Rating
+            name="book-rating"
+            value={document.average_rating ? Number(document.average_rating) : 0}
+            precision={0.1}
+            readOnly
+          />
+          <Typography>{document.ratings_count} Ratings</Typography>
+        </DetailCard>
       </CustomTabPanel>
-      <CustomTabPanel value={value} index={1} component={BoxContent}>
-        <CardBody>
-          <DetailsCustomTabPanelJsonDiv>
-            <pre><code>
-              {JSON.stringify(document, null, 2)}
-            </code></pre>
-          </DetailsCustomTabPanelJsonDiv>
-        </CardBody>
+      <CustomTabPanel value={activeTab} index={1}>
+        <RawData>
+          <pre><code>{JSON.stringify(document, null, 2)}</code></pre>
+        </RawData>
       </CustomTabPanel>
-    </DetailsBoxParent>
+    </DetailsMain>
   );
 }

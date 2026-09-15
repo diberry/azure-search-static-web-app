@@ -1,72 +1,51 @@
-import React, { useState, useEffect } from "react";
-import { useNavigate } from "react-router-dom";
+import Box from '@mui/material/Box';
 import Typography from '@mui/material/Typography';
-
+import { styled } from '@mui/material/styles';
+import { useNavigate } from 'react-router-dom';
 import SearchBar from '../../components/SearchBar/SearchBar';
-
-import { HomeSearchContainer, CenterContainer, LogoImage, HomeSearchBar, SearchControlsRow } from './styled';
-import { HomeMain } from '../../App/styled';
 import logo from '../../images/cognitive_search.jpg';
 
-export default function Home(): React.ReactElement {
+const HomeMain = styled('main')(({ theme }) => ({
+  width: '100%',
+  minHeight: theme.spacing(80),
+  display: 'flex',
+  justifyContent: 'center',
+  padding: theme.spacing(8, 2),
+}));
+
+const HomeContent = styled(Box)(({ theme }) => ({
+  width: '100%',
+  maxWidth: theme.spacing(100),
+  display: 'flex',
+  flexDirection: 'column',
+  alignItems: 'center',
+}));
+
+const Logo = styled('img')(({ theme }) => ({
+  width: '100%',
+  maxWidth: theme.spacing(50),
+  height: 'auto',
+  objectFit: 'contain',
+}));
+
+export default function Home() {
   const navigate = useNavigate();
-  const [imageLoaded, setImageLoaded] = useState<boolean>(false);
-  
-  // Prefetch the search page component when the home page loads
-  useEffect(() => {
-    // Prefetch the Search page component
-    const prefetchSearch = () => {
-      const link = document.createElement('link');
-      link.rel = 'prefetch';
-      link.href = '/src/pages/Search/Search.tsx';
-      link.as = 'script';
-      document.head.appendChild(link);
-    };
-    
-    // Short delay to prioritize critical resources first
-    const timer = setTimeout(() => {
-      prefetchSearch();
-    }, 2000);
-    
-    return () => clearTimeout(timer);
-  }, []);
-  
-  const navigateToSearchPage = (q: string): void => {
-    if (!q || q === '') {
-      q = '*'
-    }
-    navigate('/search?q=' + q);
-  }
-  
-  const handleImageLoad = (): void => {
-    setImageLoaded(true);
-  };
 
   return (
-    <CenterContainer>
     <HomeMain>
-      <HomeSearchContainer>
-        {/* Add loading="eager" to prioritize image loading and width/height for layout stability */}
-        <LogoImage 
-          isLoaded={imageLoaded ? true : false}
-          src={logo} 
-          alt="Cognitive Search"
-          loading="eager"
-          width="400"
-          height="350"
-          fetchPriority="high"
-          onLoad={handleImageLoad}
-        />
-        
-        {/* New row for poweredby and search bar that takes 80% width */}
-        <SearchControlsRow>
-          <Typography variant="body1" sx={{ textAlign: 'center', width: '100%', marginBottom: '1em' }}>Powered by Azure AI Search</Typography>
-          <HomeSearchBar>
-            <SearchBar postSearchHandler={navigateToSearchPage} width="100%"></SearchBar>
-          </HomeSearchBar>
-        </SearchControlsRow>
-      </HomeSearchContainer>
+      <HomeContent>
+        <Logo src={logo} alt="Cognitive Search" loading="eager" />
+        <Typography variant="h6" component="p" sx={{ mb: 2, textAlign: 'center' }}>
+          Powered by Azure AI Search
+        </Typography>
+        <Box sx={{ width: '100%', px: { xs: 0, sm: 2 } }}>
+          <SearchBar
+            postSearchHandler={query =>
+              navigate(`/search?q=${encodeURIComponent(query.trim() || '*')}`)}
+            width="100%"
+          />
+        </Box>
+      </HomeContent>
     </HomeMain>
-    </CenterContainer>
   );
-};
+}

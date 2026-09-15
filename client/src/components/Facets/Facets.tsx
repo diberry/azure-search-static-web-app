@@ -1,76 +1,52 @@
-import Box from '@mui/material/Box';
+import Chip from '@mui/material/Chip';
+import List from '@mui/material/List';
+import ListItem from '@mui/material/ListItem';
 import CheckboxFacet from './CheckboxFacet/CheckboxFacet';
-import {
-    StyledChip,
-    ChipLabel,
-    ChipDeleteButton,
-    FacetBox,
-    FilterList,
-    FacetList
-} from './styles.jsx';
+import type { Filter } from '../../types/models';
+import type { FacetsProps } from '../../types/props';
 
-export default function Facets(props) {
+function mapFacetName(facetName: string): string {
+  const trimmedName = facetName.trim().replace('_', ' ');
+  return trimmedName ? `${trimmedName[0].toUpperCase()}${trimmedName.slice(1)}` : '';
+}
 
-    function mapFacetName(facetName) {
-        const capitalizeFirstLetter = (string) =>
-            string[0] ? `${string[0].toUpperCase()}${string.substring(1)}` : '';
-        facetName = facetName.trim();
-        facetName = capitalizeFirstLetter(facetName);
+export default function Facets({ facets, filters, setFilters }: FacetsProps) {
+  const addFilter = (name: string, value: string) => {
+    setFilters(filters.concat({ field: name, value }));
+  };
+  const removeFilter = (filter: Filter) => {
+    setFilters(filters.filter(
+      item => item.field !== filter.field || item.value !== filter.value,
+    ));
+  };
 
-        facetName = facetName.replace('_', ' ');
-        return facetName;
-    }
-
-    function addFilter(name, value) {
-        const newFilters = props.filters.concat({ field: name, value: value });
-        props.setFilters(newFilters);
-    }
-
-    function removeFilter(filter) {      
-        const newFilters = props.filters.filter((item) => item.value !== filter.value);
-        props.setFilters(newFilters);
-    }
-
-    var facets;
-    try {
-        facets = Object.keys(props.facets).map(key => {
-            return <CheckboxFacet 
-                key={key}
-                name={key} 
-                values={props.facets[key]}
-                addFilter={addFilter}
-                removeFilter={removeFilter}
-                mapFacetName={mapFacetName}
-                selectedFacets={props.filters.filter(f => f.field === key)}
-            />;
-        });
-    } catch (error) {
-        console.log(error);
-    }
-
-    const filters = props.filters.map((filter, index) => {
-        return (
-            <li key={index}>
-                <StyledChip>
-                    <ChipLabel>{`${mapFacetName(filter.field)}: ${filter.value}`}</ChipLabel>
-                    <ChipDeleteButton onClick={() => removeFilter(filter)}>×</ChipDeleteButton>
-                </StyledChip>
-            </li>
-        );
-    });
-
-    return (
-        <Box className="mui-facets-isolation-wrapper" sx={{ height: '100%' }}>
-            <FacetBox>
-                <div id="clearFilters" style={{ padding: '8px 16px' }}>
-                    <FilterList>
-                        {filters}
-                    </FilterList>
-                </div>
-                <FacetList>
-                    {facets}
-                </FacetList>    
-            </FacetBox>
-        </Box>
-    );
+  return (
+    <div>
+      <List component="ul" disablePadding sx={{ display: 'flex', flexWrap: 'wrap', py: 1 }}>
+        {filters.map(filter => (
+          <ListItem key={`${filter.field}:${filter.value}`} disablePadding sx={{ width: 'auto', m: 0.5 }}>
+            <Chip
+              label={`${mapFacetName(filter.field)}: ${filter.value}`}
+              onDelete={() => removeFilter(filter)}
+              onClick={() => removeFilter(filter)}
+              aria-label={`Remove ${mapFacetName(filter.field)}: ${filter.value} filter`}
+            />
+          </ListItem>
+        ))}
+      </List>
+      <List component="nav" aria-label="Search facets">
+        {Object.entries(facets).map(([name, values]) => (
+          <CheckboxFacet
+            key={name}
+            name={name}
+            values={values}
+            addFilter={addFilter}
+            removeFilter={removeFilter}
+            mapFacetName={mapFacetName}
+            selectedFacets={filters.filter(filter => filter.field === name)}
+          />
+        ))}
+      </List>
+    </div>
+  );
 }

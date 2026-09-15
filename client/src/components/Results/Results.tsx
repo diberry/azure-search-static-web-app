@@ -1,50 +1,37 @@
 import Box from '@mui/material/Box';
+import Typography from '@mui/material/Typography';
+import { styled } from '@mui/material/styles';
 import Result from './Result/Result';
-import { ResultsProps } from '../../types/props';
-import {
-  ResultsContainer,
-  ResultsInfo
-} from './styled';
+import type { ResultsProps } from '../../types/props';
 
-export default function Results(props: ResultsProps) {
+const ResultsGrid = styled('div')({
+  display: 'flex',
+  flexFlow: 'row wrap',
+  justifyContent: 'center',
+  width: '100%',
+});
 
-  let results = props.searchResultDocuments.map((result, index) => {
-
-  let book = result?.document;
- 
-    return <Result 
-        key={index} 
-        document={book}
-      />;
-  });
-
-  console.log(results[0]);
-
-  // Provide default values for pagination properties
-  const skip = props.skip ?? 0;  // Default to 0 if skip is not provided
-  const count = props.count ?? 0; // Default to 0 if count is not provided
-  const top = props.top ?? 8;    // Default to 8 if top is not provided
-
-  // When there are results, show 1-based counting for beginDocNumber
-  // When no results, beginDocNumber should be 0
-  let beginDocNumber = count > 0 ? skip + 1 : 0;
-  
-  // For endDocNumber, take the smaller of (skip + top) or count
-  // This ensures we don't show ranges beyond the actual number of results
-  let endDocNumber = count > 0 ? Math.min(skip + top, count) : 0;
+export default function Results({
+  documents,
+  top,
+  skip,
+  count,
+  query,
+}: ResultsProps) {
+  const beginDocument = Math.min(skip + 1, count);
+  const endDocument = Math.min(skip + top, count);
 
   return (
     <Box>
-      <ResultsInfo variant="body1">
-        {count > 0 ? (
-          <>Showing {beginDocNumber}-{endDocNumber} of {count.toLocaleString()} results for <strong>{props.query ?? ""}</strong></>
-        ) : (
-          <>No results found for <strong>{props.query ?? ""}</strong></>
-        )}
-      </ResultsInfo>
-      <ResultsContainer container spacing={2} justifyContent="center">
-        {results}
-      </ResultsContainer>
+      <Typography sx={{ m: 2 }}>
+        Showing {beginDocument}-{endDocument} of {count.toLocaleString()} results for{' '}
+        <strong>{query}</strong>
+      </Typography>
+      <ResultsGrid>
+        {documents.map(result => (
+          <Result key={result.document.id} document={result.document} />
+        ))}
+      </ResultsGrid>
     </Box>
   );
-};
+}

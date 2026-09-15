@@ -1,150 +1,130 @@
-import React, { useEffect, useState} from 'react';
-import fetchInstance from '../../url-fetch';
-import CircularProgress from '@mui/material/CircularProgress';
-import { useLocation, useNavigate } from "react-router-dom";
-import Grid from '@mui/material/Grid';
+import { useEffect, useRef, useState } from 'react';
 import Box from '@mui/material/Box';
-import Container from '@mui/material/Container';
-import { Facet } from '../../types/models';
-import { SearchResponse, SearchResultDocument } from '../../types/api';
-
-import Results from '../../components/Results/Results';
-import Pager from '../../components/Pager';
+import CircularProgress from '@mui/material/CircularProgress';
+import { styled } from '@mui/material/styles';
+import { useLocation, useNavigate } from 'react-router-dom';
 import Facets from '../../components/Facets/Facets';
+import Pager from '../../components/Pager';
+import Results from '../../components/Results/Results';
 import SearchBar from '../../components/SearchBar/SearchBar';
+import type { SearchRequest, SearchResponse, SearchResultDocument } from '../../types/api';
+import type { FacetValue, Filter } from '../../types/models';
+import fetchInstance from '../../url-fetch';
 
-import { 
-  SearchMain, 
-  SearchBarColumn, 
-  SearchBarResults, 
-  SearchBarColumnContainer, 
-  SearchResultsContainer,
-  PagerStyle
-} from './styled';
+const SearchMain = styled('main')(({ theme }) => ({
+  minWidth: 0,
+  padding: theme.spacing(2),
+}));
 
-export default function Search(): React.ReactElement {
+const SearchLayout = styled('div')(({ theme }) => ({
+  minWidth: 0,
+  display: 'grid',
+  gridTemplateColumns: 'minmax(0, 1fr)',
+  gap: theme.spacing(2),
+  [theme.breakpoints.up('md')]: {
+    gridTemplateColumns: `minmax(${theme.spacing(32)}, 1fr) minmax(0, 3fr)`,
+  },
+}));
 
-  let location = useLocation();
+const SearchSidebar = styled('aside')(({ theme }) => ({
+  minWidth: 0,
+  [theme.breakpoints.up('md')]: {
+    borderRight: `${theme.spacing(0.125)} solid ${theme.palette.divider}`,
+    paddingRight: theme.spacing(2),
+  },
+}));
+
+export default function Search() {
+  const location = useLocation();
   const navigate = useNavigate();
-
+  const urlQuery = new URLSearchParams(location.search).get('q') || '*';
   const [results, setResults] = useState<SearchResultDocument[]>([]);
+  const [resultCount, setResultCount] = useState(0);
+  const [currentPage, setCurrentPage] = useState(1);
+  const [top] = useState(Number(new URLSearchParams(location.search).get('top')) || 8);
+  const [filters, setFilters] = useState<Filter[]>([]);
+  const [facets, setFacets] = useState<Record<string, FacetValue[]>>({});
+  const [isLoading, setIsLoading] = useState(true);
+  const lastRequestKey = useRef<string | undefined>(undefined);
+  const skip = (currentPage - 1) * top;
 
-  const [q, setQ] = useState<string>(new URLSearchParams(location.search).get('q') ?? "*");
-
-  const [resultCount, setResultCount] = useState<number>(0);
-  const [currentPage, setCurrentPage] = useState<number>(1);
-  const [top] = useState<number>(Number(new URLSearchParams(location.search).get('top')) || 8);
-  const [skip, setSkip] = useState<number>(Number(new URLSearchParams(location.search).get('skip')) || 0);
-  const [filters, setFilters] = useState<string[]>([]);
-  const [facets, setFacets] = useState<Record<string, Facet>>({});
-  const [isLoading, setIsLoading] = useState<boolean>(true);
-
-  let resultsPerPage = top;
-
-  // Handle page changes in a controlled manner
-  function handlePageChange(newPage: number): void {
-    setCurrentPage(newPage);
-  }
-
-  // Calculate skip value and fetch results when relevant parameters change
   useEffect(() => {
-    // Calculate skip based on current page
-    const calculatedSkip = (currentPage - 1) * top;
-    
-    // Only update if skip has actually changed
-    if (calculatedSkip !== skip) {
-      setSkip(calculatedSkip);
-      return; // Skip the fetch since skip will change and trigger another useEffect
+    const body: SearchRequest = { q: urlQuery, top, skip, filters };
+    const requestKey = JSON.stringify(body);
+    if (lastRequestKey.current === requestKey) {
+      return undefined;
     }
-    
-    // Proceed with fetch
-    setIsLoading(true);
-    
-    const body = {
-      q: q,
-      top: top,
-      skip: skip,
-      filters: filters
-    };
+    lastRequestKey.current = requestKey;
 
-    
-    fetchInstance<any>('/api/search', { body, method: 'POST' })
-      .then(apiResponse => {
-        // Map API response to our new interface
-        const response: SearchResponse = {
-          count: apiResponse.count || 0,
-          facets: apiResponse.facets || {},
-          // Map existing results or documents to our new searchResults property
-          searchResults: (apiResponse.results || apiResponse.documents || []) as SearchResultDocument[],
-          skip: apiResponse.skip,
-          top: apiResponse.top
-        };
-        
-        setResults(response.searchResults);
+    const controller = new AbortController();
+    setIsLoading(true);
+    fetchInstance<SearchResponse>('/api/search', {
+      body,
+      method: 'POST',
+      signal: controller.signal,
+    })
+      .then(response => {
+        setResults(response.results);
         setFacets(response.facets);
         setResultCount(response.count);
         setIsLoading(false);
       })
       .catch(error => {
-        console.error('Search error:', error);
-        setIsLoading(false);
+        if (error instanceof Error && error.name !== 'AbortError') {
+          console.error('Search error:', error);
+          setResults([]);
+          setFacets({});
+          setResultCount(0);
+          setIsLoading(false);
+        }
       });
-  }, [q, top, skip, filters, currentPage]);
 
-  // pushing the new search term to history when q is updated
-  // allows the back button to work as expected when coming back from the details page
-  useEffect(() => {
-    navigate('/search?q=' + q);
+    return () => controller.abort();
+  }, [filters, skip, top, urlQuery]);
+
+  const submitSearch = (searchTerm: string) => {
+    const nextQuery = searchTerm.trim() || '*';
     setCurrentPage(1);
     setFilters([]);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [q]);
+    navigate(`/search?q=${encodeURIComponent(nextQuery)}`);
+  };
 
-
-  let postSearchHandler = (searchTerm: string): void => {
-    setQ(searchTerm);
-  }
-
-
-  // filters should be applied across entire result set, 
-  // not just within the current page
-  const updateFilterHandler = (newFilters: string[]): void => {
-
-    // Reset paging
-    setSkip(0);
+  const updateFilters = (nextFilters: Filter[]) => {
     setCurrentPage(1);
-
-    // Set filters
-    setFilters(newFilters);
+    setFilters(nextFilters);
   };
 
   return (
-    <Container maxWidth={false} component={SearchMain} sx={{ marginTop: 2 }}>
-      <Grid container spacing={2} sx={{ px: 2, marginTop: 2 }}> {/* Added horizontal padding and top margin */}
-        <Grid item xs={12} md={3} component={SearchBarColumn} sx={{ 
-          padding: '8px 16px 16px 16px',
-          borderRight: '1px solid #f0f0f0'
-        }}>
-          <SearchBarColumnContainer>
-            <SearchBar postSearchHandler={postSearchHandler} query={q} width={undefined}></SearchBar>
-          </SearchBarColumnContainer>
-          <Facets facets={facets} filters={filters} setFilters={updateFilterHandler}></Facets>
-        </Grid>
-        <Grid item xs={12} md={9} component={SearchBarResults}>
+    <SearchMain>
+      <SearchLayout>
+        <SearchSidebar>
+          <SearchBar postSearchHandler={submitSearch} query={urlQuery} width="100%" />
+          <Facets facets={facets} filters={filters} setFilters={updateFilters} />
+        </SearchSidebar>
+        <Box sx={{ minWidth: 0 }}>
           {isLoading ? (
-            <Box display="flex" justifyContent="center" p={2}>
-              <CircularProgress />
+            <Box aria-live="polite" sx={{ display: 'flex', justifyContent: 'center', p: 2 }}>
+              <CircularProgress aria-label="Loading search results" />
             </Box>
           ) : (
-            <SearchResultsContainer>
-              <Results searchResultDocuments={results} top={top} skip={skip} count={resultCount} query={q} ></Results>
-              <PagerStyle>
-                <Pager currentPage={currentPage} resultCount={resultCount} resultsPerPage={resultsPerPage} onPageChange={handlePageChange}></Pager>
-              </PagerStyle>
-            </SearchResultsContainer>
+            <>
+              <Results
+                documents={results}
+                top={top}
+                skip={skip}
+                count={resultCount}
+                query={urlQuery}
+              />
+              <Pager
+                currentPage={currentPage}
+                resultCount={resultCount}
+                resultsPerPage={top}
+                onPageChange={setCurrentPage}
+              />
+            </>
           )}
-        </Grid>
-      </Grid>
-    </Container>
+        </Box>
+      </SearchLayout>
+    </SearchMain>
   );
 }

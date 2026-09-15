@@ -8,9 +8,16 @@
     "build": "tsc && vite build",
     "lint": "eslint .",
     "preview": "vite preview",
-    "clean:vite": "rm -rf node_modules/.vite && rm -rf build",
+    "clean:vite": "node -e \"require('node:fs').rmSync('node_modules/.vite',{recursive:true,force:true});require('node:fs').rmSync('build',{recursive:true,force:true})\"",
     "type-check": "tsc --noEmit",
-    "dev:build": "tsc && vite build && vite --host --port 3000"
+    "dev:build": "tsc && vite build && vite --host --port 3000",
+    "test:api": "playwright test --project=api",
+    "test:e2e": "playwright test --project=e2e",
+    "test:visual": "playwright test --project=visual",
+    "test:structure": "node tests/structure/design-system.mjs current",
+    "test:structure:design": "node tests/structure/design-system.mjs design",
+    "test:all": "npm run test:structure && playwright test",
+    "test:design": "npm run test:structure:design && playwright test --config=playwright.design.config.js"
   },
   "dependencies": {
     "@emotion/react": "^11.14.0",
@@ -22,7 +29,9 @@
     "react-router-dom": "^7.2.0"
   },
   "devDependencies": {
+    "@axe-core/playwright": "^4.13.0",
     "@eslint/js": "^9.21.0",
+    "@playwright/test": "^1.61.0",
     "@types/react": "^19.0.10",
     "@types/react-dom": "^19.0.4",
     "@vitejs/plugin-react": "^4.3.4",

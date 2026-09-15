@@ -13,10 +13,6 @@ namespace WebSearch.Function
 {
     public class Suggest
     {
-        private static string searchApiKey = Environment.GetEnvironmentVariable("SearchApiKey", EnvironmentVariableTarget.Process);
-        private static string searchServiceName = Environment.GetEnvironmentVariable("SearchServiceName", EnvironmentVariableTarget.Process);
-        private static string searchIndexName = Environment.GetEnvironmentVariable("SearchIndexName", EnvironmentVariableTarget.Process) ?? "good-books";
-
         private readonly ILogger<Lookup> _logger;
 
         public Suggest(ILogger<Lookup> logger)
@@ -32,16 +28,19 @@ namespace WebSearch.Function
             // Get Document Id
             string requestBody = await new StreamReader(req.Body).ReadToEndAsync();
             var data = JsonSerializer.Deserialize<RequestBodySuggest>(requestBody);
+            if (data is null ||
+                string.IsNullOrWhiteSpace(data.SearchText) ||
+                string.IsNullOrWhiteSpace(data.SuggesterName) ||
+                data.Size is < 1 or > 100)
+            {
+                return await ApiResponses.WriteErrorAsync(
+                    req,
+                    HttpStatusCode.BadRequest,
+                    "The request must include q, suggester, and top between 1 and 100.");
+            }
 
-            // Azure AI Search 
-            Uri serviceEndpoint = new($"https://{searchServiceName}.search.windows.net/");
-
-            SearchClient searchClient = new(
-
-                serviceEndpoint,
-                searchIndexName,
-                new AzureKeyCredential(searchApiKey)
-            );
+            // Azure AI Search (managed identity by default; API key only when SEARCH_USE_KEY_AUTH=true)
+            SearchClient searchClient = SearchClientFactory.CreateSearchClient();
 
             SuggestOptions options = new()
 
@@ -57,7 +56,7 @@ namespace WebSearch.Function
                 ["suggestions"] = suggesterResponse.Value.Results.ToList()
             };
 
-            var response = req.CreateResponse(HttpStatusCode.Found);
+            var response = req.CreateResponse(HttpStatusCode.OK);
 
             // Serialize data
             var serializer = new JsonObjectSerializer(

@@ -1,6 +1,5 @@
-// Types for React component props
-import { Document, Facet } from './models';
-import { SearchResultDocument } from './api';
+import type { SearchResultDocument } from './api';
+import type { BookDocument, FacetValue, Filter } from './models';
 
 export interface SearchBarProps {
   postSearchHandler: (query: string) => void;
@@ -9,32 +8,35 @@ export interface SearchBarProps {
 }
 
 export interface ResultsProps {
-  query?: string;
-  searchResultDocuments: SearchResultDocument[];
-  count?: number;
-  skip?: number;
-  top?: number;
+  query: string;
+  documents: SearchResultDocument[];
+  count: number;
+  skip: number;
+  top: number;
 }
 
 export interface ResultProps {
-  document: Document;
+  document: BookDocument;
 }
 
 export interface PagerProps {
-  pageCount: number;
   currentPage: number;
+  resultCount: number;
+  resultsPerPage: number;
   onPageChange: (page: number) => void;
 }
 
 export interface FacetsProps {
-  facets?: Record<string, Facet[]>;
-  onFacetValueSelection: (fieldName: string, value: string, selected: boolean) => void;
-  selectedFacets: Record<string, string[]>;
+  facets: Record<string, FacetValue[]>;
+  filters: Filter[];
+  setFilters: (filters: Filter[]) => void;
 }
 
 export interface CheckboxFacetProps {
-  fieldName: string;
-  values: Array<{value: string; count: number; selected: boolean}>;
-  onSelection: (fieldName: string, value: string, selected: boolean) => void;
-  selectedFacets: Record<string, string[]>;
+  name: string;
+  values: FacetValue[];
+  selectedFacets: Filter[];
+  addFilter: (name: string, value: string) => void;
+  removeFilter: (filter: Filter) => void;
+  mapFacetName: (name: string) => string;
 }
